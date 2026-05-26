@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,11 +15,14 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+
 	ctx := context.Background()
 
 	db, err := pgxpool.New(ctx, mustEnv("DATABASE_URL"))
 	if err != nil {
-		log.Fatalf("connect db: %v", err)
+		slog.Error("connect db", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -39,28 +42,31 @@ func main() {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server: %v", err)
+			slog.Error("server", "error", err)
+			os.Exit(1)
 		}
 	}()
-	log.Printf("API listening on :%s", port)
+	slog.Info("API listening", "port", port)
 
 	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	<-sigCtx.Done()
 
-	log.Println("API shutting down...")
+	slog.Info("API shutting down")
 	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutCtx); err != nil {
-		log.Fatalf("API shutdown: %v", err)
+		slog.Error("API shutdown", "error", err)
+		os.Exit(1)
 	}
-	log.Println("API stopped")
+	slog.Info("API stopped")
 }
 
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("required env var %s not set", key)
+		slog.Error("required env var not set", "key", key)
+		os.Exit(1)
 	}
 	return v
 }
@@ -79,7 +85,8 @@ func envInt(key string, def int) int {
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
-		log.Fatalf("env var %s must be an integer: %v", key, err)
+		slog.Error("env var must be an integer", "key", key, "error", err)
+		os.Exit(1)
 	}
 	return n
 }

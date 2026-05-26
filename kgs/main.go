@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,22 +14,26 @@ import (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+
 	ctx := context.Background()
 
 	db, err := pgxpool.New(ctx, mustEnv("DATABASE_URL"))
 	if err != nil {
-		log.Fatalf("connect db: %v", err)
+		slog.Error("connect db", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
 	// Seed mode: pre-populate keys_available then exit.
 	if n := envInt("SEED_COUNT", 0); n > 0 {
-		log.Printf("seeding %d keys...", n)
+		slog.Info("seeding keys", "count", n)
 		inserted, err := GenerateKeys(ctx, db, n)
 		if err != nil {
-			log.Fatalf("seed: %v", err)
+			slog.Error("seed", "error", err)
+			os.Exit(1)
 		}
-		log.Printf("inserted %d keys", inserted)
+		slog.Info("seed complete", "inserted", inserted)
 		return
 	}
 
@@ -39,36 +43,40 @@ func main() {
 
 	ks := NewKeyStore(db, batchSize, refillAt)
 	if err := ks.Fill(ctx); err != nil {
-		log.Fatalf("initial key fill: %v", err)
+		slog.Error("initial key fill", "error", err)
+		os.Exit(1)
 	}
-	log.Printf("key buffer loaded: %d keys", ks.Len())
+	slog.Info("key buffer loaded", "size", ks.Len())
 
 	httpSrv := &http.Server{Addr: ":" + port, Handler: NewServer(ks).Handler()}
 
 	go func() {
 		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server: %v", err)
+			slog.Error("server", "error", err)
+			os.Exit(1)
 		}
 	}()
-	log.Printf("KGS listening on :%s", port)
+	slog.Info("KGS listening", "port", port)
 
 	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 	<-sigCtx.Done()
 
-	log.Println("KGS shutting down...")
+	slog.Info("KGS shutting down")
 	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := httpSrv.Shutdown(shutCtx); err != nil {
-		log.Fatalf("KGS shutdown: %v", err)
+		slog.Error("KGS shutdown", "error", err)
+		os.Exit(1)
 	}
-	log.Println("KGS stopped")
+	slog.Info("KGS stopped")
 }
 
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("required env var %s not set", key)
+		slog.Error("required env var not set", "key", key)
+		os.Exit(1)
 	}
 	return v
 }
@@ -87,7 +95,8 @@ func envInt(key string, def int) int {
 	}
 	n, err := strconv.Atoi(v)
 	if err != nil {
-		log.Fatalf("env var %s must be an integer: %v", key, err)
+		slog.Error("env var must be an integer", "key", key, "error", err)
+		os.Exit(1)
 	}
 	return n
 }

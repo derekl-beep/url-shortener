@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -19,12 +19,15 @@ const (
 )
 
 func main() {
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
 	db, err := pgxpool.New(ctx, mustEnv("DATABASE_URL"))
 	if err != nil {
-		log.Fatalf("connect db: %v", err)
+		slog.Error("connect db", "error", err)
+		os.Exit(1)
 	}
 	defer db.Close()
 
@@ -35,11 +38,12 @@ func main() {
 	if err := rdb.XGroupCreateMkStream(ctx, stream, group, "0").Err(); err != nil {
 		// BUSYGROUP means the group already exists — safe to ignore.
 		if err.Error() != "BUSYGROUP Consumer Group name already exists" {
-			log.Fatalf("create consumer group: %v", err)
+			slog.Error("create consumer group", "error", err)
+			os.Exit(1)
 		}
 	}
 
-	log.Printf("worker started, consuming %s", stream)
+	slog.Info("worker started", "stream", stream)
 
 	for {
 		msgs, err := rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
@@ -57,7 +61,7 @@ func main() {
 			if ctx.Err() != nil {
 				break
 			}
-			log.Printf("xreadgroup: %v", err)
+			slog.Error("xreadgroup", "error", err)
 			continue
 		}
 
@@ -66,14 +70,14 @@ func main() {
 			err := insertClick(insertCtx, db, msg.Values)
 			cancel()
 			if err != nil {
-				log.Printf("insert %s: %v", msg.ID, err)
+				slog.Error("insert click", "msg_id", msg.ID, "error", err)
 				continue
 			}
 			rdb.XAck(ctx, stream, group, msg.ID)
 		}
 	}
 
-	log.Println("worker stopped")
+	slog.Info("worker stopped")
 }
 
 func insertClick(ctx context.Context, db *pgxpool.Pool, v map[string]any) error {
@@ -94,7 +98,8 @@ func str(v any) string {
 func mustEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Fatalf("required env var %s not set", key)
+		slog.Error("required env var not set", "key", key)
+		os.Exit(1)
 	}
 	return v
 }
