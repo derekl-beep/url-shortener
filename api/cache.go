@@ -13,10 +13,8 @@ type Cache struct {
 	client *redis.Client
 }
 
-func NewCache(addr string) *Cache {
-	return &Cache{
-		client: redis.NewClient(&redis.Options{Addr: addr}),
-	}
+func NewCache(client *redis.Client) *Cache {
+	return &Cache{client: client}
 }
 
 func (c *Cache) Get(ctx context.Context, key string) (string, error) {

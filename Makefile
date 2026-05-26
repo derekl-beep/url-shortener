@@ -1,6 +1,6 @@
 DB_URL=postgres://postgres:postgres@localhost:5432/urlshortener
 
-.PHONY: infra migrate seed kgs api
+.PHONY: infra migrate seed kgs api worker
 
 infra:
 	docker-compose up -d postgres redis
@@ -17,3 +17,6 @@ kgs:
 
 api:
 	DATABASE_URL=$(DB_URL) KGS_URL=http://localhost:8081 REDIS_ADDR=localhost:6379 go run ./api
+
+worker:
+	DATABASE_URL=$(DB_URL) REDIS_ADDR=localhost:6379 go run ./worker

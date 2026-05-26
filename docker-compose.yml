@@ -17,20 +17,7 @@ services:
 
   # kafka:
   #   image: confluentinc/cp-kafka:7.6.0
-  #   environment:
-  #     KAFKA_NODE_ID: 1
-  #     KAFKA_PROCESS_ROLES: broker,controller
-  #     # Two listeners: PLAINTEXT for host access, INTERNAL for container-to-container
-  #     KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,INTERNAL://0.0.0.0:29092,CONTROLLER://0.0.0.0:9093
-  #     KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,INTERNAL://kafka:29092
-  #     KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT
-  #     KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-  #     KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
-  #     KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
-  #     KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-  #     KAFKA_CLUSTER_ID: "dGhpcyBpcyBhIHRlc3QgY2x1c3Rlcg=="
-  #   ports:
-  #     - "9092:9092"
+  #   (uncomment if you need Kafka for high-throughput multi-consumer pipelines)
 
 volumes:
   postgres_data:

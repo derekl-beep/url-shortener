@@ -9,14 +9,15 @@ import (
 )
 
 type Handler struct {
-	store   *Store
-	kgs     *KGSClient
-	cache   *Cache
-	baseURL string
+	store    *Store
+	kgs      *KGSClient
+	cache    *Cache
+	producer *Producer
+	baseURL  string
 }
 
-func NewHandler(store *Store, kgs *KGSClient, cache *Cache, baseURL string) *Handler {
-	return &Handler{store: store, kgs: kgs, cache: cache, baseURL: baseURL}
+func NewHandler(store *Store, kgs *KGSClient, cache *Cache, producer *Producer, baseURL string) *Handler {
+	return &Handler{store: store, kgs: kgs, cache: cache, producer: producer, baseURL: baseURL}
 }
 
 type createRequest struct {
@@ -82,6 +83,7 @@ func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	// Cache hit — skip DB entirely.
 	if url, err := h.cache.Get(r.Context(), key); err == nil && url != "" {
 		http.Redirect(w, r, url, http.StatusFound)
+		h.producer.PublishClick(key, ipFromRequest(r), r.UserAgent(), r.Referer())
 		return
 	}
 
@@ -99,6 +101,7 @@ func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	h.cache.Set(r.Context(), key, originalURL)
 
 	http.Redirect(w, r, originalURL, http.StatusFound)
+	h.producer.PublishClick(key, ipFromRequest(r), r.UserAgent(), r.Referer())
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

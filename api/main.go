@@ -8,6 +8,7 @@ import (
 	"strconv"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 func main() {
@@ -23,10 +24,12 @@ func main() {
 	baseURL := envOr("BASE_URL", "http://localhost:8080")
 	port := envOr("PORT", "8080")
 
-	cache := NewCache(mustEnv("REDIS_ADDR"))
+	rdb := redis.NewClient(&redis.Options{Addr: mustEnv("REDIS_ADDR")})
+	cache := NewCache(rdb)
+	producer := NewProducer(rdb)
 	store := NewStore(db)
 	kgs := NewKGSClient(kgsURL)
-	handler := NewHandler(store, kgs, cache, baseURL)
+	handler := NewHandler(store, kgs, cache, producer, baseURL)
 	mux := NewServer(handler)
 
 	log.Printf("API listening on :%s", port)
