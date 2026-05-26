@@ -1,65 +1,8 @@
-# URL Shortener — System Design Summary
+# URL Shortener
 
-## Core Flow
+A production-grade URL shortener built to explore every component of the system design.
 
-- User submits a long URL → backend assigns a pre-generated short key → stores mapping in DB → returns `https://<domain>/<short_key>`
-- On redirect: backend looks up `short_key` in Redis first, then DB → returns `302` redirect to preserve analytics
-
----
-
-## Database Schema
-
-```
-urls
-├── short_key     VARCHAR(8)    PRIMARY KEY
-├── original_url  TEXT          NOT NULL
-├── url_hash      CHAR(64)      UNIQUE INDEX  ← SHA256 of original_url, for fast dedup
-├── created_at    TIMESTAMP
-└── expires_at    TIMESTAMP     NULLABLE      ← NULL = never expires
-```
-
-Separate `click_events` table (or analytics store) for redirect analytics.
-
----
-
-## Key Generation Service (KGS)
-
-- Pre-generates a large pool of random short keys, stored in a keys DB (`keys_available` / `keys_used`)
-- Multiple replicas, each claims a partitioned batch of keys atomically on startup → no duplicates
-- Each replica holds an in-memory buffer of keys — if it crashes, those keys are wasted but correctness is preserved
-
----
-
-## Scaling
-
-- **Backend:** horizontally scaled behind a load balancer
-- **Reads:** Redis cache (check first) + read replicas. Solves replication lag — new URLs are written to Redis immediately on creation
-- **Writes:** KGS eliminates expensive hash collision writes. Primary DB handles writes only
-- **CDN** layer in front for caching popular redirects at the edge
-
----
-
-## Analytics Pipeline
-
-- `302` redirect chosen to preserve click data
-- Redirect event is logged async to Kafka/SQS (non-blocking, not in the critical path)
-- Consumer workers write to a columnar store (ClickHouse / BigQuery) optimized for append-heavy workloads
-
-**Click event schema:**
-
-```
-click_events
-├── short_key     VARCHAR(8)
-├── clicked_at    TIMESTAMP
-├── ip_address    VARCHAR
-├── user_agent    TEXT
-├── referrer      TEXT
-└── country       VARCHAR    ← derived from IP via geo lookup
-```
-
----
-
-## Full Architecture
+## Architecture
 
 ```
 Client
@@ -79,14 +22,106 @@ Primary DB                         ↓
 Read Replicas
 ```
 
----
+## Services
 
-## Recommended Build Order
+| Service | Directory | Port | Description |
+|---------|-----------|------|-------------|
+| API | `api/` | 8080 | Registration and redirect endpoints |
+| KGS | `kgs/` | 8081 | Key Generation Service |
 
-1. DB schema
-2. KGS (key pool + batch claiming)
-3. Registration API
-4. Redirect API
-5. Redis caching layer
-6. Analytics pipeline
-7. Frontend UI
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/urls` | Shorten a URL |
+| `GET` | `/{key}` | Redirect to original URL |
+
+**Shorten a URL:**
+```bash
+curl -X POST localhost:8080/urls \
+  -H "Content-Type: application/json" \
+  -d '{"url": "https://example.com"}'
+
+# {"short_url":"http://localhost:8080/xxxxxxxx","key":"xxxxxxxx"}
+```
+
+**Redirect:**
+```bash
+curl -L localhost:8080/<key>
+```
+
+## Local Development
+
+**Prerequisites:** Go 1.22+, Docker
+
+```bash
+# 1. Start infrastructure (Postgres + Redis)
+make infra
+
+# 2. Run migrations
+make migrate
+
+# 3. Seed the key pool (one-time)
+make seed
+
+# 4. Start services in separate terminals
+make kgs
+make api
+```
+
+**Environment variables:**
+
+| Variable | Default | Service |
+|----------|---------|---------|
+| `DATABASE_URL` | — | api, kgs |
+| `KGS_URL` | — | api |
+| `REDIS_ADDR` | — | api |
+| `BASE_URL` | `http://localhost:8080` | api |
+| `PORT` | `8080` / `8081` | api / kgs |
+| `BATCH_SIZE` | `10000` | kgs |
+| `REFILL_THRESHOLD` | `1000` | kgs |
+| `SEED_COUNT` | `0` | kgs |
+
+## Database Schema
+
+```
+urls
+├── short_key     VARCHAR(8)    PRIMARY KEY
+├── original_url  TEXT          NOT NULL
+├── url_hash      CHAR(64)      UNIQUE INDEX  ← SHA256 of original_url, for dedup
+├── created_at    TIMESTAMPTZ
+└── expires_at    TIMESTAMPTZ   NULLABLE      ← NULL = never expires
+
+keys_available
+└── key_value     VARCHAR(8)    PRIMARY KEY   ← pre-generated pool
+
+keys_used
+├── key_value     VARCHAR(8)    PRIMARY KEY   ← audit trail
+└── used_at       TIMESTAMPTZ
+
+click_events                                  ← populated by analytics pipeline
+├── short_key     VARCHAR(8)
+├── clicked_at    TIMESTAMPTZ
+├── ip_address    INET
+├── user_agent    TEXT
+├── referrer      TEXT
+└── country       VARCHAR(2)    ← derived from IP via geo lookup
+```
+
+## Key Design Decisions
+
+- **KGS pre-generation:** keys are generated in bulk and claimed atomically with `FOR UPDATE SKIP LOCKED` — no collision retries on writes
+- **Redis on write:** new URLs are written to Redis immediately after DB insert, so redirects work before read replicas catch up
+- **SHA256 dedup:** duplicate URLs are detected in a single indexed lookup before touching the KGS
+- **302 redirect:** preserves click analytics (301 would be cached by browsers indefinitely)
+- **Async analytics:** redirect events will be logged to Kafka outside the critical path
+
+## Build Progress
+
+- [x] DB schema
+- [x] KGS
+- [x] Registration API
+- [x] Redirect API
+- [x] Redis caching
+- [ ] Analytics pipeline
+- [ ] Frontend UI
