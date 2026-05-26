@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 )
 
 type KGSClient struct {
@@ -13,7 +14,7 @@ type KGSClient struct {
 }
 
 func NewKGSClient(baseURL string) *KGSClient {
-	return &KGSClient{baseURL: baseURL, http: &http.Client{}}
+	return &KGSClient{baseURL: baseURL, http: &http.Client{Timeout: 2 * time.Second}}
 }
 
 func (k *KGSClient) NextKey(ctx context.Context) (string, error) {

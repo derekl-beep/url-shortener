@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 type Server struct {
@@ -18,7 +19,7 @@ func NewServer(ks *KeyStore) *Server {
 }
 
 func (s *Server) ListenAndServe(addr string) error {
-	return http.ListenAndServe(addr, s.mux)
+	return http.ListenAndServe(addr, http.TimeoutHandler(s.mux, 2*time.Second, `{"error":"request timeout"}`))
 }
 
 func (s *Server) handleKey(w http.ResponseWriter, r *http.Request) {

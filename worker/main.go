@@ -56,7 +56,10 @@ func main() {
 		}
 
 		for _, msg := range msgs[0].Messages {
-			if err := insertClick(ctx, db, msg.Values); err != nil {
+			insertCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			err := insertClick(insertCtx, db, msg.Values)
+			cancel()
+			if err != nil {
 				log.Printf("insert %s: %v", msg.ID, err)
 				continue
 			}

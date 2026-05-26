@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -70,7 +71,9 @@ func (ks *KeyStore) Len() int {
 }
 
 func (ks *KeyStore) refill() {
-	keys, err := ks.claim(context.Background(), ks.batchSize)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	keys, err := ks.claim(ctx, ks.batchSize)
 
 	ks.mu.Lock()
 	defer ks.mu.Unlock()
