@@ -82,6 +82,7 @@ docker build -f Dockerfile.worker -t url-shortener-worker .
 | `BATCH_SIZE` | `10000` | kgs |
 | `REFILL_THRESHOLD` | `1000` | kgs |
 | `SEED_COUNT` | `0` | kgs |
+| `CONSUMER_NAME` | hostname | worker |
 
 ## Database Schema
 
@@ -133,6 +134,7 @@ click_events                                  ← populated by analytics pipelin
 | Structured logging (`log/slog`) | ✅ |
 | Health check (`/healthz` on API + KGS) | ✅ |
 | Multi-stage Dockerfiles | ✅ |
+| Worker horizontal scaling (`CONSUMER_NAME`) | ✅ |
 
 ## Production Gaps
 
@@ -145,7 +147,6 @@ click_events                                  ← populated by analytics pipelin
 | Security | URL blocklist — should reject `localhost`, RFC1918, known malicious domains |
 | Security | Security headers — CSP, `X-Frame-Options`, `X-Content-Type-Options` |
 | Scalability | KGS partitioning — replicas currently claim overlapping key batches |
-| Scalability | Worker consumer name is hardcoded (`"worker-1"`) — blocks horizontal scaling |
 | Scalability | DB connection pool tuning — `pgxpool` defaults not tuned for production load |
 | Scalability | Cache expiry gap — expired URLs can still redirect if cached |
 | Operations | Migration tooling — `golang-migrate` or `goose` for versioning and rollback |

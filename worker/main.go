@@ -13,13 +13,15 @@ import (
 )
 
 const (
-	stream   = "click-events"
-	group    = "click-workers"
-	consumer = "worker-1"
+	stream = "click-events"
+	group  = "click-workers"
 )
 
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, nil)))
+
+	hostname, _ := os.Hostname()
+	consumer := envOr("CONSUMER_NAME", hostname)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
@@ -102,4 +104,11 @@ func mustEnv(key string) string {
 		os.Exit(1)
 	}
 	return v
+}
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
