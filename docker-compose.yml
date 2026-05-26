@@ -9,15 +9,65 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7
     ports:
       - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-  # kafka:
-  #   image: confluentinc/cp-kafka:7.6.0
-  #   (uncomment if you need Kafka for high-throughput multi-consumer pipelines)
+  kgs:
+    build:
+      context: .
+      dockerfile: Dockerfile.kgs
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/urlshortener
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/urlshortener
+      KGS_URL: http://kgs:8081
+      REDIS_ADDR: redis:6379
+      BASE_URL: http://localhost:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kgs:
+        condition: service_started
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/urlshortener
+      REDIS_ADDR: redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
 volumes:
   postgres_data:

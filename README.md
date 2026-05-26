@@ -62,7 +62,30 @@ make api
 make worker
 ```
 
-**Build Docker images:**
+**Full stack via Docker Compose:**
+
+```bash
+# 1. Start infrastructure and run migrations + seed while Postgres is accessible
+docker-compose up postgres -d
+make migrate
+make seed
+
+# 2. Start all services
+docker-compose up
+```
+
+**Active development (faster iteration, no image rebuild):**
+
+```bash
+make infra    # start Postgres + Redis only
+make migrate
+make seed
+make kgs
+make api
+make worker
+```
+
+**Build Docker images manually:**
 
 ```bash
 docker build -f Dockerfile.api    -t url-shortener-api    .
