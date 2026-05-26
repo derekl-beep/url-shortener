@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -17,7 +19,8 @@ const (
 )
 
 func main() {
-	ctx := context.Background()
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
 	db, err := pgxpool.New(ctx, mustEnv("DATABASE_URL"))
 	if err != nil {
@@ -51,6 +54,9 @@ func main() {
 			continue
 		}
 		if err != nil {
+			if ctx.Err() != nil {
+				break
+			}
 			log.Printf("xreadgroup: %v", err)
 			continue
 		}
@@ -66,6 +72,8 @@ func main() {
 			rdb.XAck(ctx, stream, group, msg.ID)
 		}
 	}
+
+	log.Println("worker stopped")
 }
 
 func insertClick(ctx context.Context, db *pgxpool.Pool, v map[string]any) error {

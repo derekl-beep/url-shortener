@@ -3,8 +3,12 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -39,11 +43,26 @@ func main() {
 	}
 	log.Printf("key buffer loaded: %d keys", ks.Len())
 
-	srv := NewServer(ks)
+	httpSrv := &http.Server{Addr: ":" + port, Handler: NewServer(ks).Handler()}
+
+	go func() {
+		if err := httpSrv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server: %v", err)
+		}
+	}()
 	log.Printf("KGS listening on :%s", port)
-	if err := srv.ListenAndServe(":" + port); err != nil {
-		log.Fatalf("server: %v", err)
+
+	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	<-sigCtx.Done()
+
+	log.Println("KGS shutting down...")
+	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := httpSrv.Shutdown(shutCtx); err != nil {
+		log.Fatalf("KGS shutdown: %v", err)
 	}
+	log.Println("KGS stopped")
 }
 
 func mustEnv(key string) string {

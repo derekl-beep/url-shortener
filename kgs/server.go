@@ -18,8 +18,8 @@ func NewServer(ks *KeyStore) *Server {
 	return s
 }
 
-func (s *Server) ListenAndServe(addr string) error {
-	return http.ListenAndServe(addr, http.TimeoutHandler(s.mux, 2*time.Second, `{"error":"request timeout"}`))
+func (s *Server) Handler() http.Handler {
+	return http.TimeoutHandler(s.mux, 2*time.Second, `{"error":"request timeout"}`)
 }
 
 func (s *Server) handleKey(w http.ResponseWriter, r *http.Request) {

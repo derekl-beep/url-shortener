@@ -5,7 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
@@ -32,10 +35,26 @@ func main() {
 	handler := NewHandler(store, kgs, cache, producer, baseURL)
 	mux := NewServer(handler)
 
+	srv := &http.Server{Addr: ":" + port, Handler: mux}
+
+	go func() {
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server: %v", err)
+		}
+	}()
 	log.Printf("API listening on :%s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
-		log.Fatalf("server: %v", err)
+
+	sigCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	<-sigCtx.Done()
+
+	log.Println("API shutting down...")
+	shutCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutCtx); err != nil {
+		log.Fatalf("API shutdown: %v", err)
 	}
+	log.Println("API stopped")
 }
 
 func mustEnv(key string) string {
