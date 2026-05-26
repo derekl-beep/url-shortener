@@ -49,7 +49,7 @@ curl -L localhost:8080/<key>
 
 ## Local Development
 
-**Prerequisites:** Go 1.22+, Docker
+**Prerequisites:** Go 1.25+, Docker
 
 ```bash
 make infra    # start Postgres + Redis
@@ -106,6 +106,8 @@ docker build -f Dockerfile.worker -t url-shortener-worker .
 | `REFILL_THRESHOLD` | `1000` | kgs |
 | `SEED_COUNT` | `0` | kgs |
 | `CONSUMER_NAME` | hostname | worker |
+| `RATE_LIMIT_RPM` | `10` | api |
+| `RATE_LIMIT_BURST` | `10` | api |
 
 ## Database Schema
 
@@ -143,6 +145,8 @@ click_events                                  ← populated by analytics pipelin
 
 ## What's Built
 
+**Core components**
+
 | Area | Status |
 |------|--------|
 | DB schema | ✅ |
@@ -152,12 +156,19 @@ click_events                                  ← populated by analytics pipelin
 | Redis caching | ✅ |
 | Analytics pipeline (Redis Streams → worker → Postgres) | ✅ |
 | Frontend UI | ✅ |
+
+**Production improvements**
+
+| Area | Status |
+|------|--------|
 | Timeouts | ✅ |
 | Graceful shutdown | ✅ |
 | Structured logging (`log/slog`) | ✅ |
 | Health check (`/healthz` on API + KGS) | ✅ |
 | Multi-stage Dockerfiles (`golang:1.22-alpine` → `alpine:3`) | ✅ |
 | Worker horizontal scaling (`CONSUMER_NAME`) | ✅ |
+| Rate limiting — per-IP token bucket on `POST /urls` (`RATE_LIMIT_RPM`, `RATE_LIMIT_BURST`) | ✅ |
+| URL blocklist — rejects loopback, RFC1918, link-local, and cloud metadata endpoints | ✅ |
 
 ## Production Gaps
 
@@ -166,8 +177,6 @@ click_events                                  ← populated by analytics pipelin
 | Reliability | KGS circuit breaker — no retry/backoff on KGS failure |
 | Reliability | Worker dead-letter queue — failed inserts are dropped, not retried |
 | Observability | Prometheus metrics — latency, cache hit rate, stream lag, KGS buffer depth |
-| Security | Rate limiting — no per-IP throttle on `POST /urls` or redirects |
-| Security | URL blocklist — should reject `localhost`, RFC1918, known malicious domains |
 | Security | Security headers — CSP, `X-Frame-Options`, `X-Content-Type-Options` |
 | Scalability | KGS partitioning — replicas currently claim overlapping key batches |
 | Scalability | DB connection pool tuning — `pgxpool` defaults not tuned for production load |

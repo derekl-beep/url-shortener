@@ -35,8 +35,10 @@ func main() {
 	producer := NewProducer(rdb)
 	store := NewStore(db)
 	kgs := NewKGSClient(kgsURL)
+	rateLimitRPM := envInt("RATE_LIMIT_RPM", 10)
+	rateLimitBurst := envInt("RATE_LIMIT_BURST", 10)
 	handler := NewHandler(store, kgs, cache, producer, baseURL)
-	mux := NewServer(handler)
+	mux := NewServer(handler, rateLimitRPM, rateLimitBurst)
 
 	srv := &http.Server{Addr: ":" + port, Handler: mux}
 

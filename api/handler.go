@@ -41,6 +41,11 @@ func (h *Handler) CreateURL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if err := isBlockedURL(req.URL); err != nil {
+		http.Error(w, "url not allowed", http.StatusUnprocessableEntity)
+		return
+	}
+
 	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(req.URL)))
 
 	// Dedup: return existing key if this URL was already shortened.
