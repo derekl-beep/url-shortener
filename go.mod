@@ -1,4 +1,4 @@
-module github.com/dereklau/url-shortener
+module github.com/derekl-beep/url-shortener
 
 go 1.22
 
