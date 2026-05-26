@@ -126,4 +126,4 @@ click_events                                  ← populated by analytics pipelin
 - [x] Redirect API
 - [x] Redis caching
 - [x] Analytics pipeline (Redis Streams → worker → Postgres)
-- [ ] Frontend UI
+- [x] Frontend UI
