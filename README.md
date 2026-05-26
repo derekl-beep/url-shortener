@@ -165,7 +165,7 @@ click_events                                  ← populated by analytics pipelin
 | Graceful shutdown | ✅ |
 | Structured logging (`log/slog`) | ✅ |
 | Health check (`/healthz` on API + KGS) | ✅ |
-| Multi-stage Dockerfiles (`golang:1.22-alpine` → `alpine:3`) | ✅ |
+| Multi-stage Dockerfiles (`golang:1.25-alpine` → `alpine:3`) | ✅ |
 | Worker horizontal scaling (`CONSUMER_NAME`) | ✅ |
 | Rate limiting — per-IP token bucket on `POST /urls` (`RATE_LIMIT_RPM`, `RATE_LIMIT_BURST`) | ✅ |
 | URL blocklist — rejects loopback, RFC1918, link-local, and cloud metadata endpoints | ✅ |
