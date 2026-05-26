@@ -156,7 +156,7 @@ click_events                                  ← populated by analytics pipelin
 | Graceful shutdown | ✅ |
 | Structured logging (`log/slog`) | ✅ |
 | Health check (`/healthz` on API + KGS) | ✅ |
-| Multi-stage Dockerfiles | ✅ |
+| Multi-stage Dockerfiles (`golang:1.22-alpine` → `alpine:3`) | ✅ |
 | Worker horizontal scaling (`CONSUMER_NAME`) | ✅ |
 
 ## Production Gaps
