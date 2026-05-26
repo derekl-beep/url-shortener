@@ -104,6 +104,29 @@ func (h *Handler) Redirect(w http.ResponseWriter, r *http.Request) {
 	h.producer.PublishClick(key, ipFromRequest(r), r.UserAgent(), r.Referer())
 }
 
+func (h *Handler) Healthz(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	dbErr := h.store.Ping(ctx)
+	redisErr := h.cache.Ping(ctx)
+
+	status := http.StatusOK
+	if dbErr != nil || redisErr != nil {
+		status = http.StatusServiceUnavailable
+	}
+
+	resp := map[string]any{"status": "ok"}
+	if dbErr != nil {
+		resp["status"] = "degraded"
+		resp["db"] = dbErr.Error()
+	}
+	if redisErr != nil {
+		resp["status"] = "degraded"
+		resp["redis"] = redisErr.Error()
+	}
+
+	writeJSON(w, status, resp)
+}
+
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

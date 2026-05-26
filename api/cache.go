@@ -17,6 +17,10 @@ func NewCache(client *redis.Client) *Cache {
 	return &Cache{client: client}
 }
 
+func (c *Cache) Ping(ctx context.Context) error {
+	return c.client.Ping(ctx).Err()
+}
+
 func (c *Cache) Get(ctx context.Context, key string) (string, error) {
 	val, err := c.client.Get(ctx, "url:"+key).Result()
 	if err == redis.Nil {

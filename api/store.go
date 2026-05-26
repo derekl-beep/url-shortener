@@ -16,6 +16,10 @@ func NewStore(db *pgxpool.Pool) *Store {
 	return &Store{db: db}
 }
 
+func (s *Store) Ping(ctx context.Context) error {
+	return s.db.Ping(ctx)
+}
+
 // FindByHash returns the short_key for a URL that was already shortened,
 // or an empty string if not found.
 func (s *Store) FindByHash(ctx context.Context, hash string) (string, error) {
