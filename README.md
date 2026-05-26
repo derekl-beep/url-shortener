@@ -71,6 +71,14 @@ make api
 make worker
 ```
 
+**Build Docker images:**
+
+```bash
+docker build -f Dockerfile.api    -t url-shortener-api    .
+docker build -f Dockerfile.kgs    -t url-shortener-kgs    .
+docker build -f Dockerfile.worker -t url-shortener-worker .
+```
+
 **Environment variables:**
 
 | Variable | Default | Service |
@@ -127,3 +135,38 @@ click_events                                  ← populated by analytics pipelin
 - [x] Redis caching
 - [x] Analytics pipeline (Redis Streams → worker → Postgres)
 - [x] Frontend UI
+
+## Production Gaps
+
+Items not yet implemented that a real production deployment would require.
+
+### Reliability
+- [ ] **Graceful shutdown** — signal handling + request draining on all three services; currently a SIGTERM drops in-flight requests
+- [ ] **Timeouts** — no deadlines on outbound KGS HTTP calls, DB queries, or Redis ops; a slow dependency hangs the goroutine indefinitely
+- [ ] **KGS circuit breaker** — `CreateURL` returns 503 immediately on KGS failure with no retry or backoff
+- [ ] **Worker dead-letter queue** — failed `click_events` inserts are logged and dropped; redelivery only happens on worker restart
+
+### Observability
+- [ ] **Structured logging** — replace `log.Printf` with `log/slog`; unstructured output is hard to query in production
+- [ ] **Prometheus metrics** — request latency, cache hit/miss ratio, Redis stream consumer lag, KGS buffer depth
+- [ ] **API health endpoint** — `/healthz` exists on KGS but not on the API
+
+### Security
+- [ ] **Rate limiting** — no per-IP throttle on `POST /urls` or `GET /{key}`
+- [ ] **URL blocklist** — `POST /urls` should reject `localhost`, RFC1918 addresses, and known malicious domains
+- [ ] **Security headers** — CSP, `X-Frame-Options`, `X-Content-Type-Options` missing from all responses
+
+### Scalability
+- [ ] **KGS partitioning** — multiple KGS replicas currently claim overlapping key batches; each replica needs a distinct partition range
+- [ ] **Parameterized worker consumer name** — hardcoded `"worker-1"` prevents horizontal scaling; should be an env var
+- [ ] **DB connection pool tuning** — `pgxpool` defaults need explicit `MaxConns`, `MinConns`, `MaxConnLifetime` for production load
+- [ ] **Cache expiry for expired URLs** — `store.FindByKey` enforces `expires_at` in SQL, but a cached entry can still redirect after the URL expires
+
+### Operations
+- [x] **Multi-stage Dockerfiles** — `golang:1.22-alpine` build stage, `distroless/static` runtime (~2MB image, no shell)
+- [ ] **Migration tooling** — raw `psql` pipe works locally; `golang-migrate` or `goose` adds versioning, rollback, and CI integration
+
+### Features
+- [ ] **Analytics endpoint** — `click_events` is populated; a `GET /stats/{key}` endpoint would surface the pipeline data
+- [ ] **Custom aliases** — allow `POST /urls` to accept an optional `alias` field for vanity URLs
+- [ ] **Link management** — list and delete owned links (requires auth)
